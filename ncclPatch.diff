@@ -1,0 +1,25 @@
+From 680a35c6b76bb73ce1161f6ddaa02a8e3df96221 Mon Sep 17 00:00:00 2001
+From: sclarkson <sclarkson@users.noreply.github.com>
+Date: Sat, 11 Nov 2017 19:22:06 -0800
+Subject: [PATCH] fix tests on maxwell
+
+---
+ test/include/test_utilities.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/test/include/test_utilities.h b/test/include/test_utilities.h
+index c194205..80aeaee 100644
+--- a/test/include/test_utilities.h
++++ b/test/include/test_utilities.h
+@@ -310,7 +310,7 @@ double CheckDelta(const T* results, const T* expected, int N) {
+   CUDACHECK(cudaHostGetDevicePointer(&devmax, &maxerr, 0));
+   deltaKern<T, 512><<<1, 512>>>(results, devexp, N, devmax);
+   CUDACHECK(cudaHostUnregister(&maxerr));
+-  CUDACHECK(cudaHostUnregister((void*)devexp));
++  CUDACHECK(cudaHostUnregister((void*)expected));
+   return maxerr;
+ }
+ 
+-- 
+2.16.2
+
