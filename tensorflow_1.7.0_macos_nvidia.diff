@@ -1,5 +1,5 @@
 diff --git a/tensorflow/core/framework/variant.h b/tensorflow/core/framework/variant.h
-index c02391dae3..7f76609814 100644
+index c02391dae3..23e56ed294 100644
 --- a/tensorflow/core/framework/variant.h
 +++ b/tensorflow/core/framework/variant.h
 @@ -152,7 +152,8 @@ bool DecodeVariant(const string& buf, T* value);
@@ -7,23 +7,23 @@ index c02391dae3..7f76609814 100644
  class Variant {
   public:
 -  constexpr Variant() noexcept = default;
-+//  constexpr Variant() noexcept = default;
++  //constexpr Variant() noexcept = default;
 +  Variant() noexcept = default;
-
+ 
    Variant(const Variant& other)
        : value_(other.is_empty() ? std::unique_ptr<ValueInterface>()
 diff --git a/tensorflow/core/kernels/concat_lib_gpu_impl.cu.cc b/tensorflow/core/kernels/concat_lib_gpu_impl.cu.cc
-index a561d918bd..785e0ddf4e 100644
+index 0f7adaf24a..8d89c66f3f 100644
 --- a/tensorflow/core/kernels/concat_lib_gpu_impl.cu.cc
 +++ b/tensorflow/core/kernels/concat_lib_gpu_impl.cu.cc
 @@ -69,7 +69,7 @@ __global__ void concat_variable_kernel(
    IntType num_inputs = input_ptr_data.size;
-
+ 
    // verbose declaration needed due to template
 -  extern __shared__ __align__(sizeof(T)) unsigned char smem[];
 +  extern __shared__ unsigned char smem[];
    IntType* smem_col_scan = reinterpret_cast<IntType*>(smem);
-
+ 
    if (useSmem) {
 diff --git a/tensorflow/core/kernels/depthwise_conv_op_gpu.cu.cc b/tensorflow/core/kernels/depthwise_conv_op_gpu.cu.cc
 index 94989089ec..a2e3e8bc87 100644
@@ -36,7 +36,7 @@ index 94989089ec..a2e3e8bc87 100644
 -  extern __shared__ __align__(sizeof(T)) unsigned char shared_memory[];
 +  extern __shared__ unsigned char shared_memory[];
    T* const shared_data = reinterpret_cast<T*>(shared_memory);
-
+ 
    const int num_batches = args.batch;
 @@ -452,7 +452,7 @@ __global__ __launch_bounds__(1024, 2) void DepthwiseConv2dGPUKernelNCHWSmall(
      const DepthwiseArgs args, const T* input, const T* filter, T* output) {
@@ -45,7 +45,7 @@ index 94989089ec..a2e3e8bc87 100644
 -  extern __shared__ __align__(sizeof(T)) unsigned char shared_memory[];
 +  extern __shared__ unsigned char shared_memory[];
    T* const shared_data = reinterpret_cast<T*>(shared_memory);
-
+ 
    const int num_batches = args.batch;
 @@ -1118,7 +1118,7 @@ __launch_bounds__(1024, 2) void DepthwiseConv2dBackpropFilterGPUKernelNHWCSmall(
      const DepthwiseArgs args, const T* output, const T* input, T* filter) {
@@ -54,7 +54,7 @@ index 94989089ec..a2e3e8bc87 100644
 -  extern __shared__ __align__(sizeof(T)) unsigned char shared_memory[];
 +  extern __shared__ unsigned char shared_memory[];
    T* const shared_data = reinterpret_cast<T*>(shared_memory);
-
+ 
    const int num_batches = args.batch;
 @@ -1388,7 +1388,7 @@ __launch_bounds__(1024, 2) void DepthwiseConv2dBackpropFilterGPUKernelNCHWSmall(
      const DepthwiseArgs args, const T* output, const T* input, T* filter) {
@@ -63,7 +63,7 @@ index 94989089ec..a2e3e8bc87 100644
 -  extern __shared__ __align__(sizeof(T)) unsigned char shared_memory[];
 +  extern __shared__ unsigned char shared_memory[];
    T* const shared_data = reinterpret_cast<T*>(shared_memory);
-
+ 
    const int num_batches = args.batch;
 diff --git a/tensorflow/core/kernels/split_lib_gpu.cu.cc b/tensorflow/core/kernels/split_lib_gpu.cu.cc
 index 393818730b..a7d9e02853 100644
@@ -71,18 +71,34 @@ index 393818730b..a7d9e02853 100644
 +++ b/tensorflow/core/kernels/split_lib_gpu.cu.cc
 @@ -121,7 +121,7 @@ __global__ void split_v_kernel(const T* input_ptr,
    int num_outputs = output_ptr_data.size;
-
+ 
    // verbose declaration needed due to template
 -  extern __shared__ __align__(sizeof(T)) unsigned char smem[];
 +  extern __shared__ unsigned char smem[];
    IntType* smem_col_scan = reinterpret_cast<IntType*>(smem);
-
+ 
    if (useSmem) {
 diff --git a/tensorflow/workspace.bzl b/tensorflow/workspace.bzl
-index 48728ac131..268e4fe2e6 100644
+index 0ce5cda517..3ede0d340f 100644
 --- a/tensorflow/workspace.bzl
 +++ b/tensorflow/workspace.bzl
-@@ -330,11 +330,11 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
+@@ -127,11 +127,11 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
+   tf_http_archive(
+       name = "eigen_archive",
+       urls = [
+-          "https://mirror.bazel.build/bitbucket.org/eigen/eigen/get/2355b229ea4c.tar.gz",
+-          "https://bitbucket.org/eigen/eigen/get/2355b229ea4c.tar.gz",
++          "https://mirror.bazel.build/bitbucket.org/dtrebbien/eigen/get/374842a18727.tar.gz",
++          "https://bitbucket.org/dtrebbien/eigen/get/374842a18727.tar.gz",
+       ],
+-      sha256 = "0cadb31a35b514bf2dfd6b5d38205da94ef326ec6908fc3fd7c269948467214f",
+-      strip_prefix = "eigen-eigen-2355b229ea4c",
++      sha256 = "fa26e9b9ff3a2692b092d154685ec88d6cb84d4e1e895006541aff8603f15c16",
++      strip_prefix = "dtrebbien-eigen-374842a18727",
+       build_file = str(Label("//third_party:eigen.BUILD")),
+       patch_file = str(Label("//third_party:eigen_fix_cuda_compilation.patch"))
+   )
+@@ -361,11 +361,11 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
    tf_http_archive(
        name = "protobuf_archive",
        urls = [
@@ -98,7 +114,7 @@ index 48728ac131..268e4fe2e6 100644
    )
 
    # We need to import the protobuf library under the names com_google_protobuf
-diff --git a/third_party/gpus/cuda/BUILD.tpl b/third_party/gpus/cuda/BUILD.tpl
+   diff --git a/third_party/gpus/cuda/BUILD.tpl b/third_party/gpus/cuda/BUILD.tpl
 index 2a37c65bc7..61b203e005 100644
 --- a/third_party/gpus/cuda/BUILD.tpl
 +++ b/third_party/gpus/cuda/BUILD.tpl
