@@ -1,3 +1,15 @@
+diff --git a/.gitignore b/.gitignore
+index be75938ec4..62b745e368 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -27,6 +27,7 @@ Podfile.lock
+ /tensorflow/contrib/lite/examples/ios/simple/data/*.txt
+ /tensorflow/contrib/lite/examples/ios/simple/data/*.tflite
+ xcuserdata/**
++*.whl
+ 
+ # Android
+ .gradle
 diff --git a/tensorflow/core/framework/variant.h b/tensorflow/core/framework/variant.h
 index c02391dae3..23e56ed294 100644
 --- a/tensorflow/core/framework/variant.h
@@ -79,7 +91,7 @@ index 393818730b..a7d9e02853 100644
  
    if (useSmem) {
 diff --git a/tensorflow/workspace.bzl b/tensorflow/workspace.bzl
-index 0ce5cda517..3ede0d340f 100644
+index e9e69203db..0f1ce8e010 100644
 --- a/tensorflow/workspace.bzl
 +++ b/tensorflow/workspace.bzl
 @@ -127,11 +127,11 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
@@ -112,9 +124,25 @@ index 0ce5cda517..3ede0d340f 100644
 +      sha256 = "eb16b33431b91fe8cee479575cee8de202f3626aaf00d9bf1783c6e62b4ffbc7",
 +      strip_prefix = "protobuf-50f552646ba1de79e07562b41f3999fe036b4fd0",
    )
-
+ 
    # We need to import the protobuf library under the names com_google_protobuf
-   diff --git a/third_party/gpus/cuda/BUILD.tpl b/third_party/gpus/cuda/BUILD.tpl
+@@ -556,11 +556,11 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
+   tf_http_archive(
+       name = "nccl_archive",
+       urls = [
+-          "https://mirror.bazel.build/github.com/nvidia/nccl/archive/03d856977ecbaac87e598c0c4bafca96761b9ac7.tar.gz",
+-          "https://github.com/nvidia/nccl/archive/03d856977ecbaac87e598c0c4bafca96761b9ac7.tar.gz",
++          "https://mirror.bazel.build/github.com/zhutao100/nccl/archive/b2ab0f23b11db13605abe71f193650d4f6273c6b.tar.gz",
++          "https://github.com/zhutao100/nccl/archive/b2ab0f23b11db13605abe71f193650d4f6273c6b.tar.gz",
+       ],
+-      sha256 = "2ca86fb6179ecbff789cc67c836139c1bbc0324ed8c04643405a30bf26325176",
+-      strip_prefix = "nccl-03d856977ecbaac87e598c0c4bafca96761b9ac7",
++      sha256 = "405fb578e8aaccf458e4a66baea71fe1c839b06d2983f9a03496de10f3ac1e77",
++      strip_prefix = "nccl-b2ab0f23b11db13605abe71f193650d4f6273c6b",
+       build_file = str(Label("//third_party:nccl.BUILD")),
+   )
+ 
+diff --git a/third_party/gpus/cuda/BUILD.tpl b/third_party/gpus/cuda/BUILD.tpl
 index 2a37c65bc7..61b203e005 100644
 --- a/third_party/gpus/cuda/BUILD.tpl
 +++ b/third_party/gpus/cuda/BUILD.tpl
