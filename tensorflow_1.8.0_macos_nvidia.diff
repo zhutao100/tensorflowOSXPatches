@@ -1,3 +1,46 @@
+From 86ab6b3da6adf254637e8cb9848c1bec5d6040f3 Mon Sep 17 00:00:00 2001
+From: Tao Zhu <zhutao100@gmail.com>
+Date: Tue, 22 May 2018 19:24:25 -0700
+Subject: [PATCH] Apply v1.8 Mac OS X Nvidia patch.
+
+---
+ configure.py                                        |  7 +++++--
+ tensorflow/core/framework/variant.h                 |  3 ++-
+ tensorflow/core/kernels/concat_lib_gpu_impl.cu.cc   |  2 +-
+ tensorflow/core/kernels/depthwise_conv_op_gpu.cu.cc |  8 ++++----
+ tensorflow/core/kernels/split_lib_gpu.cu.cc         |  2 +-
+ tensorflow/workspace.bzl                            | 17 +++++++++--------
+ third_party/gpus/cuda/BUILD.tpl                     |  2 +-
+ 7 files changed, 23 insertions(+), 18 deletions(-)
+
+diff --git a/configure.py b/configure.py
+index b6c32543cf..43332c3d7b 100644
+--- a/configure.py
++++ b/configure.py
+@@ -1109,8 +1109,8 @@ def set_tf_nccl_install_path(environ_cp):
+     ValueError: if this method was called under non-Linux platform.
+     UserInputError: if user has provided invalid input multiple times.
+   """
+-  if not is_linux():
+-    raise ValueError('Currently NCCL is only supported on Linux platforms.')
++  if not (is_linux() or is_macos()):
++    raise ValueError('Currently NCCL is only supported on Linux and Mac OS X platforms.')
+ 
+   ask_nccl_version = (
+       'Please specify the NCCL version you want to use. '
+@@ -1511,9 +1511,12 @@ def main():
+       'TF_CUDA_CONFIG_REPO' not in environ_cp):
+     set_tf_cuda_version(environ_cp)
+     set_tf_cudnn_version(environ_cp)
++
+     if is_linux():
+       set_tf_tensorrt_install_path(environ_cp)
+       set_tf_nccl_install_path(environ_cp)
++    if is_macos():
++      set_tf_nccl_install_path(environ_cp)
+ 
+     set_tf_cuda_compute_capabilities(environ_cp)
+     if 'LD_LIBRARY_PATH' in environ_cp and environ_cp.get(
 diff --git a/tensorflow/core/framework/variant.h b/tensorflow/core/framework/variant.h
 index c02391dae3..7f76609814 100644
 --- a/tensorflow/core/framework/variant.h
@@ -9,24 +52,24 @@ index c02391dae3..7f76609814 100644
 -  constexpr Variant() noexcept = default;
 +//  constexpr Variant() noexcept = default;
 +  Variant() noexcept = default;
-
+ 
    Variant(const Variant& other)
        : value_(other.is_empty() ? std::unique_ptr<ValueInterface>()
 diff --git a/tensorflow/core/kernels/concat_lib_gpu_impl.cu.cc b/tensorflow/core/kernels/concat_lib_gpu_impl.cu.cc
-index a561d918bd..785e0ddf4e 100644
+index a561d918bd..46c91b4511 100644
 --- a/tensorflow/core/kernels/concat_lib_gpu_impl.cu.cc
 +++ b/tensorflow/core/kernels/concat_lib_gpu_impl.cu.cc
 @@ -69,7 +69,7 @@ __global__ void concat_variable_kernel(
    IntType num_inputs = input_ptr_data.size;
-
+ 
    // verbose declaration needed due to template
 -  extern __shared__ __align__(sizeof(T)) unsigned char smem[];
-+  extern __shared__ unsigned char smem[];
++  extern __shared__ __align__(sizeof(T) > 16 ? sizeof(T) : 16) unsigned char smem[];
    IntType* smem_col_scan = reinterpret_cast<IntType*>(smem);
-
+ 
    if (useSmem) {
 diff --git a/tensorflow/core/kernels/depthwise_conv_op_gpu.cu.cc b/tensorflow/core/kernels/depthwise_conv_op_gpu.cu.cc
-index 94989089ec..a2e3e8bc87 100644
+index 5390222b3a..fcbd733614 100644
 --- a/tensorflow/core/kernels/depthwise_conv_op_gpu.cu.cc
 +++ b/tensorflow/core/kernels/depthwise_conv_op_gpu.cu.cc
 @@ -172,7 +172,7 @@ __global__ __launch_bounds__(1024, 2) void DepthwiseConv2dGPUKernelNHWCSmall(
@@ -34,55 +77,55 @@ index 94989089ec..a2e3e8bc87 100644
    assert(CanLaunchDepthwiseConv2dGPUSmall(args));
    // Holds block plus halo and filter data for blockDim.x depths.
 -  extern __shared__ __align__(sizeof(T)) unsigned char shared_memory[];
-+  extern __shared__ unsigned char shared_memory[];
++  extern __shared__ __align__(sizeof(T) > 16 ? sizeof(T) : 16) unsigned char shared_memory[];
    T* const shared_data = reinterpret_cast<T*>(shared_memory);
-
+ 
    const int num_batches = args.batch;
 @@ -452,7 +452,7 @@ __global__ __launch_bounds__(1024, 2) void DepthwiseConv2dGPUKernelNCHWSmall(
      const DepthwiseArgs args, const T* input, const T* filter, T* output) {
    assert(CanLaunchDepthwiseConv2dGPUSmall(args));
    // Holds block plus halo and filter data for blockDim.z depths.
 -  extern __shared__ __align__(sizeof(T)) unsigned char shared_memory[];
-+  extern __shared__ unsigned char shared_memory[];
++  extern __shared__ __align__(sizeof(T) > 16 ? sizeof(T) : 16) unsigned char shared_memory[];
    T* const shared_data = reinterpret_cast<T*>(shared_memory);
-
+ 
    const int num_batches = args.batch;
 @@ -1118,7 +1118,7 @@ __launch_bounds__(1024, 2) void DepthwiseConv2dBackpropFilterGPUKernelNHWCSmall(
      const DepthwiseArgs args, const T* output, const T* input, T* filter) {
    assert(CanLaunchDepthwiseConv2dBackpropFilterGPUSmall(args, blockDim.z));
    // Holds block plus halo and filter data for blockDim.x depths.
 -  extern __shared__ __align__(sizeof(T)) unsigned char shared_memory[];
-+  extern __shared__ unsigned char shared_memory[];
++  extern __shared__ __align__(sizeof(T) > 16 ? sizeof(T) : 16) unsigned char shared_memory[];
    T* const shared_data = reinterpret_cast<T*>(shared_memory);
-
+ 
    const int num_batches = args.batch;
 @@ -1388,7 +1388,7 @@ __launch_bounds__(1024, 2) void DepthwiseConv2dBackpropFilterGPUKernelNCHWSmall(
      const DepthwiseArgs args, const T* output, const T* input, T* filter) {
    assert(CanLaunchDepthwiseConv2dBackpropFilterGPUSmall(args, blockDim.x));
    // Holds block plus halo and filter data for blockDim.z depths.
 -  extern __shared__ __align__(sizeof(T)) unsigned char shared_memory[];
-+  extern __shared__ unsigned char shared_memory[];
++  extern __shared__ __align__(sizeof(T) > 16 ? sizeof(T) : 16) unsigned char shared_memory[];
    T* const shared_data = reinterpret_cast<T*>(shared_memory);
-
+ 
    const int num_batches = args.batch;
 diff --git a/tensorflow/core/kernels/split_lib_gpu.cu.cc b/tensorflow/core/kernels/split_lib_gpu.cu.cc
-index 393818730b..a7d9e02853 100644
+index 393818730b..58a1294005 100644
 --- a/tensorflow/core/kernels/split_lib_gpu.cu.cc
 +++ b/tensorflow/core/kernels/split_lib_gpu.cu.cc
 @@ -121,7 +121,7 @@ __global__ void split_v_kernel(const T* input_ptr,
    int num_outputs = output_ptr_data.size;
-
+ 
    // verbose declaration needed due to template
 -  extern __shared__ __align__(sizeof(T)) unsigned char smem[];
-+  extern __shared__ unsigned char smem[];
++  extern __shared__ __align__(sizeof(T) > 16 ? sizeof(T) : 16) unsigned char smem[];
    IntType* smem_col_scan = reinterpret_cast<IntType*>(smem);
-
+ 
    if (useSmem) {
 diff --git a/tensorflow/workspace.bzl b/tensorflow/workspace.bzl
-index 48728ac131..268e4fe2e6 100644
+index cbd75730fc..701c6e6ca7 100644
 --- a/tensorflow/workspace.bzl
 +++ b/tensorflow/workspace.bzl
-@@ -330,11 +330,11 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
+@@ -332,11 +332,11 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
    tf_http_archive(
        name = "protobuf_archive",
        urls = [
@@ -96,8 +139,25 @@ index 48728ac131..268e4fe2e6 100644
 +      sha256 = "eb16b33431b91fe8cee479575cee8de202f3626aaf00d9bf1783c6e62b4ffbc7",
 +      strip_prefix = "protobuf-50f552646ba1de79e07562b41f3999fe036b4fd0",
    )
-
+ 
    # We need to import the protobuf library under the names com_google_protobuf
+@@ -528,11 +528,12 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
+   tf_http_archive(
+       name = "nccl_archive",
+       urls = [
+-          "https://mirror.bazel.build/github.com/nvidia/nccl/archive/03d856977ecbaac87e598c0c4bafca96761b9ac7.tar.gz",
+-          "https://github.com/nvidia/nccl/archive/03d856977ecbaac87e598c0c4bafca96761b9ac7.tar.gz",
++          "https://mirror.bazel.build/github.com/zhutao100/nccl/archive/b2ab0f23b11db13605abe71f193650d4f6273c6b.tar.gz",
++          "https://github.com/zhutao100/nccl/archive/b2ab0f23b11db13605abe71f193650d4f6273c6b.tar.gz",
++
+       ],
+-      sha256 = "2ca86fb6179ecbff789cc67c836139c1bbc0324ed8c04643405a30bf26325176",
+-      strip_prefix = "nccl-03d856977ecbaac87e598c0c4bafca96761b9ac7",
++      sha256 = "405fb578e8aaccf458e4a66baea71fe1c839b06d2983f9a03496de10f3ac1e77",
++      strip_prefix = "nccl-b2ab0f23b11db13605abe71f193650d4f6273c6b",
+       build_file = clean_dep("//third_party:nccl/nccl_archive.BUILD"),
+   )
+ 
 diff --git a/third_party/gpus/cuda/BUILD.tpl b/third_party/gpus/cuda/BUILD.tpl
 index 2a37c65bc7..61b203e005 100644
 --- a/third_party/gpus/cuda/BUILD.tpl
@@ -111,4 +171,6 @@ index 2a37c65bc7..61b203e005 100644
      linkstatic = 1,
      visibility = ["//visibility:public"],
  )
+-- 
+2.16.2
 

@@ -1,25 +1,100 @@
-From 680a35c6b76bb73ce1161f6ddaa02a8e3df96221 Mon Sep 17 00:00:00 2001
-From: sclarkson <sclarkson@users.noreply.github.com>
-Date: Sat, 11 Nov 2017 19:22:06 -0800
-Subject: [PATCH] fix tests on maxwell
+From f7c09565aa2db90604d1672cff26efeb124c09e2 Mon Sep 17 00:00:00 2001
+From: Yangqing Jia <jiayq84@gmail.com>
+Date: Wed, 21 Dec 2016 13:21:49 -0800
+Subject: [PATCH] minor fixes to build on Mac OS
 
 ---
- test/include/test_utilities.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Makefile         | 26 ++++++++++++++++++++++++--
+ src/primitives.h |  8 ++++++++
+ 2 files changed, 32 insertions(+), 2 deletions(-)
 
-diff --git a/test/include/test_utilities.h b/test/include/test_utilities.h
-index c194205..80aeaee 100644
---- a/test/include/test_utilities.h
-+++ b/test/include/test_utilities.h
-@@ -310,7 +310,7 @@ double CheckDelta(const T* results, const T* expected, int N) {
-   CUDACHECK(cudaHostGetDevicePointer(&devmax, &maxerr, 0));
-   deltaKern<T, 512><<<1, 512>>>(results, devexp, N, devmax);
-   CUDACHECK(cudaHostUnregister(&maxerr));
--  CUDACHECK(cudaHostUnregister((void*)devexp));
-+  CUDACHECK(cudaHostUnregister((void*)expected));
-   return maxerr;
- }
+diff --git a/Makefile b/Makefile
+index 8fc02b6..b9ab2d0 100644
+--- a/Makefile
++++ b/Makefile
+@@ -17,6 +17,12 @@ CUDA_LIB ?= $(CUDA_HOME)/lib64
+ CUDA_INC ?= $(CUDA_HOME)/include
+ NVCC ?= $(CUDA_HOME)/bin/nvcc
  
++UNAME := $(shell uname)
++
++ifeq ($(UNAME), Darwin)
++	CUDA_LIB = $(CUDA_HOME)/lib
++endif
++
+ NVCC_GENCODE ?= -gencode=arch=compute_35,code=sm_35 \
+                 -gencode=arch=compute_50,code=sm_50 \
+                 -gencode=arch=compute_52,code=sm_52 \
+@@ -25,7 +31,11 @@ NVCC_GENCODE ?= -gencode=arch=compute_35,code=sm_35 \
+ CXXFLAGS   := -I$(CUDA_INC) -fPIC -fvisibility=hidden
+ NVCUFLAGS  := -ccbin $(CXX) $(NVCC_GENCODE) -lineinfo -std=c++11 -maxrregcount 96
+ # Use addprefix so that we can specify more than one path
+-LDFLAGS    := $(addprefix -L,${CUDA_LIB}) -lcudart -lrt
++LDFLAGS    := $(addprefix -L,${CUDA_LIB}) -lcudart
++
++ifeq ($(UNAME), Linux)
++	LDFLAGS += -lrt
++endif
+ 
+ ifeq ($(DEBUG), 0)
+ NVCUFLAGS += -O3
+@@ -56,6 +66,11 @@ NCCL_PATCH   := 2
+ CXXFLAGS  += -DNCCL_MAJOR=$(NCCL_MAJOR) -DNCCL_MINOR=$(NCCL_MINOR) -DNCCL_PATCH=$(NCCL_PATCH)
+ 
+ CUDA_VERSION ?= $(shell ls $(CUDA_LIB)/libcudart.so.* | head -1 | rev | cut -d "." -f -2 | rev)
++
++ifeq ($(UNAME), Darwin)
++CUDA_VERSION = $(shell $(NVCC) --version | tail -1 | sed "s/.*, V//")
++endif
++
+ CUDA_MAJOR = $(shell echo $(CUDA_VERSION) | cut -d "." -f 1)
+ CUDA_MINOR = $(shell echo $(CUDA_VERSION) | cut -d "." -f 2)
+ CXXFLAGS  += -DCUDA_MAJOR=$(CUDA_MAJOR) -DCUDA_MINOR=$(CUDA_MINOR)
+@@ -80,6 +95,13 @@ LIBLINK    := $(patsubst lib%.so, -l%, $(LIBNAME))
+ LIBOBJ     := $(patsubst %.cu, $(OBJDIR)/%.o, $(filter %.cu, $(LIBSRCFILES)))
+ DEPFILES   := $(patsubst %.o, %.d, $(LIBOBJ)) $(patsubst %, %.d, $(TESTBINS)) $(patsubst %, %.d, $(MPITESTBINS))
+ 
++CXX_IS_CLANG = $(shell $(CXX) --version | grep "clang" | wc -l)
++ifneq ($(strip $(CXX_IS_CLANG)), 0)
++	LINK_SHARED_STRING = 
++else
++	LINK_SHARED_STRING = -Wl,--no-as-needed -Wl,-soname,$(LIBSONAME)
++endif
++
+ all : lib staticlib
+ 
+ lib : $(INCTARGETS) $(LIBDIR)/$(LIBTARGET)
+@@ -91,7 +113,7 @@ staticlib : $(INCTARGETS) $(LIBDIR)/$(STATICLIBTARGET)
+ $(LIBDIR)/$(LIBTARGET) : $(LIBOBJ)
+ 	@printf "Linking   %-35s > %s\n" $(LIBTARGET) $@
+ 	mkdir -p $(LIBDIR)
+-	$(CXX) $(CXXFLAGS) -shared -Wl,--no-as-needed -Wl,-soname,$(LIBSONAME) -o $@ $(LDFLAGS) $(LIBOBJ)
++	$(CXX) $(CXXFLAGS) -shared $(LINK_SHARED_STRING) -o $@ $(LDFLAGS) $(LIBOBJ)
+ 	ln -sf $(LIBSONAME) $(LIBDIR)/$(LIBNAME)
+ 	ln -sf $(LIBTARGET) $(LIBDIR)/$(LIBSONAME)
+ 
+diff --git a/src/primitives.h b/src/primitives.h
+index 8f8fb69..23cd324 100644
+--- a/src/primitives.h
++++ b/src/primitives.h
+@@ -8,9 +8,17 @@
+ #define PRIMITIVES_H_
+ 
+ #include <type_traits>
++#include <cstddef>  // for nullptr_t
+ #include "copy_kernel.h" // for FuncPassA
+ #include "reduce_kernel.h" // for reduction funcs
+ 
++#ifdef __APPLE__
++// Workaround for Mac OS: when tested on Apple clang 8.0.0 and Mac OSX 10.12
++// with cuda 8.0, the host compiler did not correctly declare nullptr_t
++// although it is specified by the C++11 standard. We thus explicitly declare
++// it here.
++typedef decltype(nullptr) nullptr_t;
++#endif  // __APPLE__
+ 
+ /* Defines primitive operations: Copy, Reduce, DoubleCopy, and ReduceCopy.
+  *
 -- 
 2.16.2
 
