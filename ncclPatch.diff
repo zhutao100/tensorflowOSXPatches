@@ -1,15 +1,5 @@
-From f7c09565aa2db90604d1672cff26efeb124c09e2 Mon Sep 17 00:00:00 2001
-From: Yangqing Jia <jiayq84@gmail.com>
-Date: Wed, 21 Dec 2016 13:21:49 -0800
-Subject: [PATCH] minor fixes to build on Mac OS
-
----
- Makefile         | 26 ++++++++++++++++++++++++--
- src/primitives.h |  8 ++++++++
- 2 files changed, 32 insertions(+), 2 deletions(-)
-
 diff --git a/Makefile b/Makefile
-index 8fc02b6..b9ab2d0 100644
+index c37b7f7..2ebe2ed 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -17,6 +17,12 @@ CUDA_LIB ?= $(CUDA_HOME)/lib64
@@ -19,13 +9,13 @@ index 8fc02b6..b9ab2d0 100644
 +UNAME := $(shell uname)
 +
 +ifeq ($(UNAME), Darwin)
-+	CUDA_LIB = $(CUDA_HOME)/lib
++CUDA_LIB = $(CUDA_HOME)/lib
 +endif
 +
  NVCC_GENCODE ?= -gencode=arch=compute_35,code=sm_35 \
                  -gencode=arch=compute_50,code=sm_50 \
                  -gencode=arch=compute_52,code=sm_52 \
-@@ -25,7 +31,11 @@ NVCC_GENCODE ?= -gencode=arch=compute_35,code=sm_35 \
+@@ -27,7 +33,11 @@ NVCC_GENCODE ?= -gencode=arch=compute_35,code=sm_35 \
  CXXFLAGS   := -I$(CUDA_INC) -fPIC -fvisibility=hidden
  NVCUFLAGS  := -ccbin $(CXX) $(NVCC_GENCODE) -lineinfo -std=c++11 -maxrregcount 96
  # Use addprefix so that we can specify more than one path
@@ -33,38 +23,67 @@ index 8fc02b6..b9ab2d0 100644
 +LDFLAGS    := $(addprefix -L,${CUDA_LIB}) -lcudart
 +
 +ifeq ($(UNAME), Linux)
-+	LDFLAGS += -lrt
++LDFLAGS += -lrt
 +endif
  
  ifeq ($(DEBUG), 0)
  NVCUFLAGS += -O3
-@@ -56,6 +66,11 @@ NCCL_PATCH   := 2
+@@ -57,7 +67,14 @@ NCCL_MINOR   := 3
+ NCCL_PATCH   := 5
  CXXFLAGS  += -DNCCL_MAJOR=$(NCCL_MAJOR) -DNCCL_MINOR=$(NCCL_MINOR) -DNCCL_PATCH=$(NCCL_PATCH)
  
- CUDA_VERSION ?= $(shell ls $(CUDA_LIB)/libcudart.so.* | head -1 | rev | cut -d "." -f -2 | rev)
++
 +
 +ifeq ($(UNAME), Darwin)
 +CUDA_VERSION = $(shell $(NVCC) --version | tail -1 | sed "s/.*, V//")
++else
+ CUDA_VERSION ?= $(shell ls $(CUDA_LIB)/libcudart.so.* | head -1 | rev | cut -d "." -f -2 | rev)
 +endif
 +
  CUDA_MAJOR = $(shell echo $(CUDA_VERSION) | cut -d "." -f 1)
  CUDA_MINOR = $(shell echo $(CUDA_VERSION) | cut -d "." -f 2)
  CXXFLAGS  += -DCUDA_MAJOR=$(CUDA_MAJOR) -DCUDA_MINOR=$(CUDA_MINOR)
-@@ -80,6 +95,13 @@ LIBLINK    := $(patsubst lib%.so, -l%, $(LIBNAME))
+@@ -67,7 +84,11 @@ CXXFLAGS  += -DCUDA_MAJOR=$(CUDA_MAJOR) -DCUDA_MINOR=$(CUDA_MINOR)
+ 
+ INCEXPORTS  := nccl.h
+ LIBSRCFILES := libwrap.cu core.cu all_gather.cu all_reduce.cu broadcast.cu reduce.cu reduce_scatter.cu
++ifeq ($(UNAME), Darwin)
++LIBNAME     := libnccl.dylib
++else
+ LIBNAME     := libnccl.so
++endif
+ STATICLIBNAME := libnccl_static.a
+ 
+ INCDIR := $(BUILDDIR)/include
+@@ -75,13 +96,26 @@ LIBDIR := $(BUILDDIR)/lib
+ OBJDIR := $(BUILDDIR)/obj
+ 
+ INCTARGETS := $(patsubst %, $(INCDIR)/%, $(INCEXPORTS))
++STATICLIBTARGET := $(STATICLIBNAME)
++ifeq ($(UNAME), Darwin)
++LIBSONAME  := $(patsubst %.dylib,%.$(NCCL_MAJOR).dylib,$(LIBNAME))
++LIBTARGET  := $(patsubst %.dylib,%.$(NCCL_MAJOR).$(NCCL_MINOR).$(NCCL_PATCH).dylib,$(LIBNAME))
++LIBLINK    := $(patsubst lib%.dylib, -l%, $(LIBNAME))
++else
+ LIBSONAME  := $(patsubst %,%.$(NCCL_MAJOR),$(LIBNAME))
+ LIBTARGET  := $(patsubst %,%.$(NCCL_MAJOR).$(NCCL_MINOR).$(NCCL_PATCH),$(LIBNAME))
+-STATICLIBTARGET := $(STATICLIBNAME)
+ LIBLINK    := $(patsubst lib%.so, -l%, $(LIBNAME))
++endif
  LIBOBJ     := $(patsubst %.cu, $(OBJDIR)/%.o, $(filter %.cu, $(LIBSRCFILES)))
  DEPFILES   := $(patsubst %.o, %.d, $(LIBOBJ)) $(patsubst %, %.d, $(TESTBINS)) $(patsubst %, %.d, $(MPITESTBINS))
  
 +CXX_IS_CLANG = $(shell $(CXX) --version | grep "clang" | wc -l)
 +ifneq ($(strip $(CXX_IS_CLANG)), 0)
-+	LINK_SHARED_STRING = 
++LINK_SHARED_STRING = 
 +else
-+	LINK_SHARED_STRING = -Wl,--no-as-needed -Wl,-soname,$(LIBSONAME)
++LINK_SHARED_STRING = -Wl,--no-as-needed -Wl,-soname,$(LIBSONAME)
 +endif
 +
  all : lib staticlib
  
  lib : $(INCTARGETS) $(LIBDIR)/$(LIBTARGET)
-@@ -91,7 +113,7 @@ staticlib : $(INCTARGETS) $(LIBDIR)/$(STATICLIBTARGET)
+@@ -93,7 +127,7 @@ staticlib : $(INCTARGETS) $(LIBDIR)/$(STATICLIBTARGET)
  $(LIBDIR)/$(LIBTARGET) : $(LIBOBJ)
  	@printf "Linking   %-35s > %s\n" $(LIBTARGET) $@
  	mkdir -p $(LIBDIR)
@@ -74,7 +93,7 @@ index 8fc02b6..b9ab2d0 100644
  	ln -sf $(LIBTARGET) $(LIBDIR)/$(LIBSONAME)
  
 diff --git a/src/primitives.h b/src/primitives.h
-index 8f8fb69..23cd324 100644
+index bcaeca8..5ebab45 100644
 --- a/src/primitives.h
 +++ b/src/primitives.h
 @@ -8,9 +8,17 @@
@@ -95,6 +114,3 @@ index 8f8fb69..23cd324 100644
  
  /* Defines primitive operations: Copy, Reduce, DoubleCopy, and ReduceCopy.
   *
--- 
-2.16.2
-

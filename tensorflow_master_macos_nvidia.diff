@@ -1,10 +1,10 @@
-From 9aceb042ee196d875110dddc0a85541ea217e297 Mon Sep 17 00:00:00 2001
-From: Tao <zhutao100@gmail.com>
-Date: Tue, 29 May 2018 20:42:25 -0700
-Subject: [PATCH] Apply Mac OS X Nvidia GPU build patch.
+From 55a96f2efb57ed89a358f763025ffe489f782a1c Mon Sep 17 00:00:00 2001
+From: Tao Zhu <zhutao100@gmail.com>
+Date: Wed, 30 May 2018 15:29:16 -0700
+Subject: [PATCH] Apply Mac OS X Nvidia GPU patch.
 
 ---
- configure.py                                       |  7 +-
+ configure.py                                       | 11 ++-
  tensorflow/core/framework/variant.h                |  3 +-
  tensorflow/core/kernels/concat_lib_gpu_impl.cu.cc  |  2 +-
  .../core/kernels/depthwise_conv_op_gpu.cu.cc       |  8 +-
@@ -12,10 +12,10 @@ Subject: [PATCH] Apply Mac OS X Nvidia GPU build patch.
  tensorflow/workspace.bzl                           | 17 ++--
  third_party/gpus/crosstool/CROSSTOOL.tpl           | 94 ++++++++++++++++++++++
  third_party/gpus/cuda/BUILD.tpl                    |  2 +-
- 8 files changed, 117 insertions(+), 18 deletions(-)
+ 8 files changed, 119 insertions(+), 20 deletions(-)
 
 diff --git a/configure.py b/configure.py
-index b6c32543cf..43332c3d7b 100644
+index b6c32543cf..65c59d40d3 100644
 --- a/configure.py
 +++ b/configure.py
 @@ -1109,8 +1109,8 @@ def set_tf_nccl_install_path(environ_cp):
@@ -29,6 +29,17 @@ index b6c32543cf..43332c3d7b 100644
  
    ask_nccl_version = (
        'Please specify the NCCL version you want to use. '
+@@ -1121,8 +1121,8 @@ def set_tf_nccl_install_path(environ_cp):
+         environ_cp, 'TF_NCCL_VERSION', ask_nccl_version, _DEFAULT_NCCL_VERSION)
+     tf_nccl_version = reformat_version_sequence(str(tf_nccl_version), 1)
+ 
+-    if tf_nccl_version == '1':
+-      break  # No need to get install path, NCCL 1 is a GitHub repo.
++    if is_linux() and tf_nccl_version == '1':
++      break  # No need to get install path for NCCL 1 in Linux, as NCCL 1 is hosted on GitHub.
+ 
+     # TODO(csigg): Look with ldconfig first if we can find the library in paths
+     # like /usr/lib/x86_64-linux-gnu and the header file in the corresponding
 @@ -1511,9 +1511,12 @@ def main():
        'TF_CUDA_CONFIG_REPO' not in environ_cp):
      set_tf_cuda_version(environ_cp)
@@ -123,7 +134,7 @@ index 393818730b..58a1294005 100644
  
    if (useSmem) {
 diff --git a/tensorflow/workspace.bzl b/tensorflow/workspace.bzl
-index 286459d01c..b78da0cbba 100644
+index 286459d01c..1342ae69da 100644
 --- a/tensorflow/workspace.bzl
 +++ b/tensorflow/workspace.bzl
 @@ -332,11 +332,11 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
@@ -148,14 +159,14 @@ index 286459d01c..b78da0cbba 100644
        urls = [
 -          "https://mirror.bazel.build/github.com/nvidia/nccl/archive/03d856977ecbaac87e598c0c4bafca96761b9ac7.tar.gz",
 -          "https://github.com/nvidia/nccl/archive/03d856977ecbaac87e598c0c4bafca96761b9ac7.tar.gz",
-+          "https://mirror.bazel.build/github.com/zhutao100/nccl/archive/b2ab0f23b11db13605abe71f193650d4f6273c6b.tar.gz",
-+          "https://github.com/zhutao100/nccl/archive/b2ab0f23b11db13605abe71f193650d4f6273c6b.tar.gz",
++          "https://mirror.bazel.build/github.com/zhutao100/nccl/archive/f4bd6498d283a7cee5ac88a682c4480fb3a4f421.tar.gz",
++          "https://github.com/zhutao100/nccl/archive/f4bd6498d283a7cee5ac88a682c4480fb3a4f421.tar.gz",
 +
        ],
 -      sha256 = "2ca86fb6179ecbff789cc67c836139c1bbc0324ed8c04643405a30bf26325176",
 -      strip_prefix = "nccl-03d856977ecbaac87e598c0c4bafca96761b9ac7",
-+      sha256 = "405fb578e8aaccf458e4a66baea71fe1c839b06d2983f9a03496de10f3ac1e77",
-+      strip_prefix = "nccl-b2ab0f23b11db13605abe71f193650d4f6273c6b",
++      sha256 = "631c8e5888962b07a3c732affe69efc35b3b281a834ed26cdc3b9f85c426e79e",
++      strip_prefix = "nccl-f4bd6498d283a7cee5ac88a682c4480fb3a4f421",
        build_file = clean_dep("//third_party:nccl/nccl_archive.BUILD"),
    )
  
