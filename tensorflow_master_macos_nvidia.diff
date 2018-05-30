@@ -1,0 +1,279 @@
+From 9aceb042ee196d875110dddc0a85541ea217e297 Mon Sep 17 00:00:00 2001
+From: Tao <zhutao100@gmail.com>
+Date: Tue, 29 May 2018 20:42:25 -0700
+Subject: [PATCH] Apply Mac OS X Nvidia GPU build patch.
+
+---
+ configure.py                                       |  7 +-
+ tensorflow/core/framework/variant.h                |  3 +-
+ tensorflow/core/kernels/concat_lib_gpu_impl.cu.cc  |  2 +-
+ .../core/kernels/depthwise_conv_op_gpu.cu.cc       |  8 +-
+ tensorflow/core/kernels/split_lib_gpu.cu.cc        |  2 +-
+ tensorflow/workspace.bzl                           | 17 ++--
+ third_party/gpus/crosstool/CROSSTOOL.tpl           | 94 ++++++++++++++++++++++
+ third_party/gpus/cuda/BUILD.tpl                    |  2 +-
+ 8 files changed, 117 insertions(+), 18 deletions(-)
+
+diff --git a/configure.py b/configure.py
+index b6c32543cf..43332c3d7b 100644
+--- a/configure.py
++++ b/configure.py
+@@ -1109,8 +1109,8 @@ def set_tf_nccl_install_path(environ_cp):
+     ValueError: if this method was called under non-Linux platform.
+     UserInputError: if user has provided invalid input multiple times.
+   """
+-  if not is_linux():
+-    raise ValueError('Currently NCCL is only supported on Linux platforms.')
++  if not (is_linux() or is_macos()):
++    raise ValueError('Currently NCCL is only supported on Linux and Mac OS X platforms.')
+ 
+   ask_nccl_version = (
+       'Please specify the NCCL version you want to use. '
+@@ -1511,9 +1511,12 @@ def main():
+       'TF_CUDA_CONFIG_REPO' not in environ_cp):
+     set_tf_cuda_version(environ_cp)
+     set_tf_cudnn_version(environ_cp)
++
+     if is_linux():
+       set_tf_tensorrt_install_path(environ_cp)
+       set_tf_nccl_install_path(environ_cp)
++    if is_macos():
++      set_tf_nccl_install_path(environ_cp)
+ 
+     set_tf_cuda_compute_capabilities(environ_cp)
+     if 'LD_LIBRARY_PATH' in environ_cp and environ_cp.get(
+diff --git a/tensorflow/core/framework/variant.h b/tensorflow/core/framework/variant.h
+index c02391dae3..7f76609814 100644
+--- a/tensorflow/core/framework/variant.h
++++ b/tensorflow/core/framework/variant.h
+@@ -152,7 +152,8 @@ bool DecodeVariant(const string& buf, T* value);
+ //
+ class Variant {
+  public:
+-  constexpr Variant() noexcept = default;
++//  constexpr Variant() noexcept = default;
++  Variant() noexcept = default;
+ 
+   Variant(const Variant& other)
+       : value_(other.is_empty() ? std::unique_ptr<ValueInterface>()
+diff --git a/tensorflow/core/kernels/concat_lib_gpu_impl.cu.cc b/tensorflow/core/kernels/concat_lib_gpu_impl.cu.cc
+index a561d918bd..46c91b4511 100644
+--- a/tensorflow/core/kernels/concat_lib_gpu_impl.cu.cc
++++ b/tensorflow/core/kernels/concat_lib_gpu_impl.cu.cc
+@@ -69,7 +69,7 @@ __global__ void concat_variable_kernel(
+   IntType num_inputs = input_ptr_data.size;
+ 
+   // verbose declaration needed due to template
+-  extern __shared__ __align__(sizeof(T)) unsigned char smem[];
++  extern __shared__ __align__(sizeof(T) > 16 ? sizeof(T) : 16) unsigned char smem[];
+   IntType* smem_col_scan = reinterpret_cast<IntType*>(smem);
+ 
+   if (useSmem) {
+diff --git a/tensorflow/core/kernels/depthwise_conv_op_gpu.cu.cc b/tensorflow/core/kernels/depthwise_conv_op_gpu.cu.cc
+index 5390222b3a..fcbd733614 100644
+--- a/tensorflow/core/kernels/depthwise_conv_op_gpu.cu.cc
++++ b/tensorflow/core/kernels/depthwise_conv_op_gpu.cu.cc
+@@ -172,7 +172,7 @@ __global__ __launch_bounds__(1024, 2) void DepthwiseConv2dGPUKernelNHWCSmall(
+     const DepthwiseArgs args, const T* input, const T* filter, T* output) {
+   assert(CanLaunchDepthwiseConv2dGPUSmall(args));
+   // Holds block plus halo and filter data for blockDim.x depths.
+-  extern __shared__ __align__(sizeof(T)) unsigned char shared_memory[];
++  extern __shared__ __align__(sizeof(T) > 16 ? sizeof(T) : 16) unsigned char shared_memory[];
+   T* const shared_data = reinterpret_cast<T*>(shared_memory);
+ 
+   const int num_batches = args.batch;
+@@ -452,7 +452,7 @@ __global__ __launch_bounds__(1024, 2) void DepthwiseConv2dGPUKernelNCHWSmall(
+     const DepthwiseArgs args, const T* input, const T* filter, T* output) {
+   assert(CanLaunchDepthwiseConv2dGPUSmall(args));
+   // Holds block plus halo and filter data for blockDim.z depths.
+-  extern __shared__ __align__(sizeof(T)) unsigned char shared_memory[];
++  extern __shared__ __align__(sizeof(T) > 16 ? sizeof(T) : 16) unsigned char shared_memory[];
+   T* const shared_data = reinterpret_cast<T*>(shared_memory);
+ 
+   const int num_batches = args.batch;
+@@ -1118,7 +1118,7 @@ __launch_bounds__(1024, 2) void DepthwiseConv2dBackpropFilterGPUKernelNHWCSmall(
+     const DepthwiseArgs args, const T* output, const T* input, T* filter) {
+   assert(CanLaunchDepthwiseConv2dBackpropFilterGPUSmall(args, blockDim.z));
+   // Holds block plus halo and filter data for blockDim.x depths.
+-  extern __shared__ __align__(sizeof(T)) unsigned char shared_memory[];
++  extern __shared__ __align__(sizeof(T) > 16 ? sizeof(T) : 16) unsigned char shared_memory[];
+   T* const shared_data = reinterpret_cast<T*>(shared_memory);
+ 
+   const int num_batches = args.batch;
+@@ -1388,7 +1388,7 @@ __launch_bounds__(1024, 2) void DepthwiseConv2dBackpropFilterGPUKernelNCHWSmall(
+     const DepthwiseArgs args, const T* output, const T* input, T* filter) {
+   assert(CanLaunchDepthwiseConv2dBackpropFilterGPUSmall(args, blockDim.x));
+   // Holds block plus halo and filter data for blockDim.z depths.
+-  extern __shared__ __align__(sizeof(T)) unsigned char shared_memory[];
++  extern __shared__ __align__(sizeof(T) > 16 ? sizeof(T) : 16) unsigned char shared_memory[];
+   T* const shared_data = reinterpret_cast<T*>(shared_memory);
+ 
+   const int num_batches = args.batch;
+diff --git a/tensorflow/core/kernels/split_lib_gpu.cu.cc b/tensorflow/core/kernels/split_lib_gpu.cu.cc
+index 393818730b..58a1294005 100644
+--- a/tensorflow/core/kernels/split_lib_gpu.cu.cc
++++ b/tensorflow/core/kernels/split_lib_gpu.cu.cc
+@@ -121,7 +121,7 @@ __global__ void split_v_kernel(const T* input_ptr,
+   int num_outputs = output_ptr_data.size;
+ 
+   // verbose declaration needed due to template
+-  extern __shared__ __align__(sizeof(T)) unsigned char smem[];
++  extern __shared__ __align__(sizeof(T) > 16 ? sizeof(T) : 16) unsigned char smem[];
+   IntType* smem_col_scan = reinterpret_cast<IntType*>(smem);
+ 
+   if (useSmem) {
+diff --git a/tensorflow/workspace.bzl b/tensorflow/workspace.bzl
+index 286459d01c..b78da0cbba 100644
+--- a/tensorflow/workspace.bzl
++++ b/tensorflow/workspace.bzl
+@@ -332,11 +332,11 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
+   tf_http_archive(
+       name = "protobuf_archive",
+       urls = [
+-          "https://mirror.bazel.build/github.com/google/protobuf/archive/396336eb961b75f03b25824fe86cf6490fb75e3a.tar.gz",
+-          "https://github.com/google/protobuf/archive/396336eb961b75f03b25824fe86cf6490fb75e3a.tar.gz",
++          "https://mirror.bazel.build/github.com/dtrebbien/protobuf/archive/50f552646ba1de79e07562b41f3999fe036b4fd0.tar.gz",
++          "https://github.com/dtrebbien/protobuf/archive/50f552646ba1de79e07562b41f3999fe036b4fd0.tar.gz",
+       ],
+-      sha256 = "846d907acf472ae233ec0882ef3a2d24edbbe834b80c305e867ac65a1f2c59e3",
+-      strip_prefix = "protobuf-396336eb961b75f03b25824fe86cf6490fb75e3a",
++      sha256 = "eb16b33431b91fe8cee479575cee8de202f3626aaf00d9bf1783c6e62b4ffbc7",
++      strip_prefix = "protobuf-50f552646ba1de79e07562b41f3999fe036b4fd0",
+   )
+ 
+   # We need to import the protobuf library under the names com_google_protobuf
+@@ -528,11 +528,12 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
+   tf_http_archive(
+       name = "nccl_archive",
+       urls = [
+-          "https://mirror.bazel.build/github.com/nvidia/nccl/archive/03d856977ecbaac87e598c0c4bafca96761b9ac7.tar.gz",
+-          "https://github.com/nvidia/nccl/archive/03d856977ecbaac87e598c0c4bafca96761b9ac7.tar.gz",
++          "https://mirror.bazel.build/github.com/zhutao100/nccl/archive/b2ab0f23b11db13605abe71f193650d4f6273c6b.tar.gz",
++          "https://github.com/zhutao100/nccl/archive/b2ab0f23b11db13605abe71f193650d4f6273c6b.tar.gz",
++
+       ],
+-      sha256 = "2ca86fb6179ecbff789cc67c836139c1bbc0324ed8c04643405a30bf26325176",
+-      strip_prefix = "nccl-03d856977ecbaac87e598c0c4bafca96761b9ac7",
++      sha256 = "405fb578e8aaccf458e4a66baea71fe1c839b06d2983f9a03496de10f3ac1e77",
++      strip_prefix = "nccl-b2ab0f23b11db13605abe71f193650d4f6273c6b",
+       build_file = clean_dep("//third_party:nccl/nccl_archive.BUILD"),
+   )
+ 
+diff --git a/third_party/gpus/crosstool/CROSSTOOL.tpl b/third_party/gpus/crosstool/CROSSTOOL.tpl
+index 60b19daf1d..ab571a0948 100644
+--- a/third_party/gpus/crosstool/CROSSTOOL.tpl
++++ b/third_party/gpus/crosstool/CROSSTOOL.tpl
+@@ -295,3 +295,97 @@ toolchain {
+ 
+ %{host_compiler_includes}
+ }
++
++toolchain {
++  abi_version: "local"
++  abi_libc_version: "local"
++  builtin_sysroot: ""
++  compiler: "compiler"
++  host_system_name: "local"
++  needsPic: true
++  target_libc: "macosx"
++  target_cpu: "darwin"
++  target_system_name: "local"
++  toolchain_identifier: "local_darwin"
++
++  tool_path { name: "ar" path: "/usr/bin/libtool" }
++  tool_path { name: "compat-ld" path: "/usr/bin/ld" }
++  tool_path { name: "cpp" path: "/usr/bin/cpp" }
++  tool_path { name: "dwp" path: "/usr/bin/dwp" }
++  tool_path { name: "gcc" path: "clang/bin/crosstool_wrapper_driver_is_not_gcc" }
++  cxx_flag: "-std=c++11"
++  ar_flag: "-static"
++  ar_flag: "-s"
++  ar_flag: "-o"
++  linker_flag: "-lc++"
++  linker_flag: "-undefined"
++  linker_flag: "dynamic_lookup"
++  # TODO(ulfjack): This is wrong on so many levels. Figure out a way to auto-detect the proper
++  # setting from the local compiler, and also how to make incremental builds correct.
++  cxx_builtin_include_directory: "/"
++  tool_path { name: "gcov" path: "/usr/bin/gcov" }
++  tool_path { name: "ld" path: "/usr/bin/ld" }
++  tool_path { name: "nm" path: "/usr/bin/nm" }
++  tool_path { name: "objcopy" path: "/usr/bin/objcopy" }
++  objcopy_embed_flag: "-I"
++  objcopy_embed_flag: "binary"
++  tool_path { name: "objdump" path: "/usr/bin/objdump" }
++  tool_path { name: "strip" path: "/usr/bin/strip" }
++
++  # Anticipated future default.
++  unfiltered_cxx_flag: "-no-canonical-prefixes"
++  # Make C++ compilation deterministic. Use linkstamping instead of these
++  # compiler symbols.
++  unfiltered_cxx_flag: "-Wno-builtin-macro-redefined"
++  unfiltered_cxx_flag: "-D__DATE__=\"redacted\""
++  unfiltered_cxx_flag: "-D__TIMESTAMP__=\"redacted\""
++  unfiltered_cxx_flag: "-D__TIME__=\"redacted\""
++
++  # Security hardening on by default.
++  # Conservative choice; -D_FORTIFY_SOURCE=2 may be unsafe in some cases.
++  compiler_flag: "-D_FORTIFY_SOURCE=1"
++  compiler_flag: "-fstack-protector"
++
++  # Enable coloring even if there's no attached terminal. Bazel removes the
++  # escape sequences if --nocolor is specified.
++  compiler_flag: "-fcolor-diagnostics"
++
++  # All warnings are enabled. Maybe enable -Werror as well?
++  compiler_flag: "-Wall"
++  # Enable a few more warnings that aren't part of -Wall.
++  compiler_flag: "-Wthread-safety"
++  compiler_flag: "-Wself-assign"
++
++  # Keep stack frames for debugging, even in opt mode.
++  compiler_flag: "-fno-omit-frame-pointer"
++
++  # Anticipated future default.
++  linker_flag: "-no-canonical-prefixes"
++
++  compilation_mode_flags {
++    mode: DBG
++    # Enable debug symbols.
++    compiler_flag: "-g"
++  }
++  compilation_mode_flags {
++    mode: OPT
++    # No debug symbols.
++    # Maybe we should enable https://gcc.gnu.org/wiki/DebugFission for opt or even generally?
++    # However, that can't happen here, as it requires special handling in Bazel.
++    compiler_flag: "-g0"
++
++    # Conservative choice for -O
++    # -O3 can increase binary size and even slow down the resulting binaries.
++    # Profile first and / or use FDO if you need better performance than this.
++    compiler_flag: "-O2"
++
++    # Disable assertions
++    compiler_flag: "-DNDEBUG"
++
++    # Removal of unused code and data at link time (can this increase binary size in some cases?).
++    compiler_flag: "-ffunction-sections"
++    compiler_flag: "-fdata-sections"
++  }
++
++%{host_compiler_includes}
++}
+diff --git a/third_party/gpus/cuda/BUILD.tpl b/third_party/gpus/cuda/BUILD.tpl
+index 2a37c65bc7..61b203e005 100644
+--- a/third_party/gpus/cuda/BUILD.tpl
++++ b/third_party/gpus/cuda/BUILD.tpl
+@@ -110,7 +110,7 @@ cc_library(
+         ".",
+         "cuda/include",
+     ],
+-    linkopts = ["-lgomp"],
++    # linkopts = ["-lgomp"],
+     linkstatic = 1,
+     visibility = ["//visibility:public"],
+ )
+-- 
+2.16.2
+
