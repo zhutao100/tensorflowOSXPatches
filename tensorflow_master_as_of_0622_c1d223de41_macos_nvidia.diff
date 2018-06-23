@@ -1,8 +1,8 @@
 diff --git a/configure.py b/configure.py
-index ada342a50a..5e59bba268 100644
+index ad585fa52e..c2d2799407 100644
 --- a/configure.py
 +++ b/configure.py
-@@ -1079,8 +1079,8 @@ def set_tf_nccl_install_path(environ_cp):
+@@ -1091,8 +1091,8 @@ def set_tf_nccl_install_path(environ_cp):
      ValueError: if this method was called under non-Linux platform.
      UserInputError: if user has provided invalid input multiple times.
    """
@@ -13,7 +13,7 @@ index ada342a50a..5e59bba268 100644
  
    ask_nccl_version = (
        'Please specify the NCCL version you want to use. '
-@@ -1091,8 +1091,8 @@ def set_tf_nccl_install_path(environ_cp):
+@@ -1103,8 +1103,8 @@ def set_tf_nccl_install_path(environ_cp):
          environ_cp, 'TF_NCCL_VERSION', ask_nccl_version, _DEFAULT_NCCL_VERSION)
      tf_nccl_version = reformat_version_sequence(str(tf_nccl_version), 1)
  
@@ -24,7 +24,7 @@ index ada342a50a..5e59bba268 100644
  
      # TODO(csigg): Look with ldconfig first if we can find the library in paths
      # like /usr/lib/x86_64-linux-gnu and the header file in the corresponding
-@@ -1485,9 +1485,12 @@ def main():
+@@ -1497,9 +1497,12 @@ def main():
        'TF_CUDA_CONFIG_REPO' not in environ_cp):
      set_tf_cuda_version(environ_cp)
      set_tf_cudnn_version(environ_cp)
@@ -118,7 +118,7 @@ index 393818730b..58a1294005 100644
  
    if (useSmem) {
 diff --git a/tensorflow/workspace.bzl b/tensorflow/workspace.bzl
-index 09f7a9b7dd..bbba3f3555 100644
+index 779b6a3d9a..1d4f0961fd 100644
 --- a/tensorflow/workspace.bzl
 +++ b/tensorflow/workspace.bzl
 @@ -331,11 +331,11 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
@@ -137,6 +137,23 @@ index 09f7a9b7dd..bbba3f3555 100644
    )
  
    # We need to import the protobuf library under the names com_google_protobuf
+@@ -416,12 +416,12 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
+ 
+   tf_http_archive(
+       name = "curl",
+-      sha256 = "e9c37986337743f37fd14fe8737f246e97aec94b39d1b71e8a5973f72a9fc4f5",
++      sha256 = "ff3e80c1ca6a068428726cd7dd19037a47cc538ce58ef61c59587191039b2ca6",
+       urls = [
+-          "https://mirror.bazel.build/curl.haxx.se/download/curl-7.60.0.tar.gz",
+-          "https://curl.haxx.se/download/curl-7.60.0.tar.gz",
++          "https://mirror.bazel.build/curl.haxx.se/download/curl-7.49.1.tar.gz",
++          "https://curl.haxx.se/download/curl-7.49.1.tar.gz",
+       ],
+-      strip_prefix = "curl-7.60.0",
++      strip_prefix = "curl-7.49.1",
+       build_file = clean_dep("//third_party:curl.BUILD"),
+   )
+ 
 @@ -527,11 +527,12 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
    tf_http_archive(
        name = "nccl_archive",
@@ -154,6 +171,111 @@ index 09f7a9b7dd..bbba3f3555 100644
        build_file = clean_dep("//third_party:nccl/nccl_archive.BUILD"),
    )
  
+diff --git a/third_party/curl.BUILD b/third_party/curl.BUILD
+index 1638b72161..4def6f9489 100644
+--- a/third_party/curl.BUILD
++++ b/third_party/curl.BUILD
+@@ -7,7 +7,6 @@ exports_files(["COPYING"])
+ 
+ CURL_WIN_COPTS = [
+     "/Iexternal/curl/lib",
+-    "/DBUILDING_LIBCURL",
+     "/DHAVE_CONFIG_H",
+     "/DCURL_DISABLE_FTP",
+     "/DCURL_DISABLE_NTLM",
+@@ -50,8 +49,6 @@ cc_library(
+         "lib/curl_addrinfo.c",
+         "lib/curl_addrinfo.h",
+         "lib/curl_base64.h",
+-        "lib/curl_ctype.c",
+-        "lib/curl_ctype.h",
+         "lib/curl_des.h",
+         "lib/curl_endian.h",
+         "lib/curl_fnmatch.c",
+@@ -78,7 +75,6 @@ cc_library(
+         "lib/curl_sec.h",
+         "lib/curl_setup.h",
+         "lib/curl_setup_once.h",
+-        "lib/curl_sha256.h",
+         "lib/curl_sspi.c",
+         "lib/curl_sspi.h",
+         "lib/curl_threads.c",
+@@ -138,8 +134,6 @@ cc_library(
+         "lib/md5.c",
+         "lib/memdebug.c",
+         "lib/memdebug.h",
+-        "lib/mime.c",
+-        "lib/mime.h",
+         "lib/mprintf.c",
+         "lib/multi.c",
+         "lib/multihandle.h",
+@@ -159,8 +153,8 @@ cc_library(
+         "lib/pop3.h",
+         "lib/progress.c",
+         "lib/progress.h",
+-        "lib/rand.c",
+-        "lib/rand.h",
++        "lib/rawstr.c",
++        "lib/rawstr.h",
+         "lib/rtsp.c",
+         "lib/rtsp.h",
+         "lib/security.c",
+@@ -168,11 +162,8 @@ cc_library(
+         "lib/select.h",
+         "lib/sendf.c",
+         "lib/sendf.h",
+-        "lib/setopt.c",
+-        "lib/setopt.h",
+         "lib/setup-os400.h",
+         "lib/setup-vms.h",
+-        "lib/sha256.c",
+         "lib/share.c",
+         "lib/share.h",
+         "lib/sigpipe.h",
+@@ -188,10 +179,10 @@ cc_library(
+         "lib/splay.c",
+         "lib/splay.h",
+         "lib/ssh.h",
+-        "lib/strcase.c",
+-        "lib/strcase.h",
+         "lib/strdup.c",
+         "lib/strdup.h",
++        "lib/strequal.c",
++        "lib/strequal.h",
+         "lib/strerror.c",
+         "lib/strerror.h",
+         "lib/strtok.c",
+@@ -250,12 +241,13 @@ cc_library(
+     }),
+     hdrs = [
+         "include/curl/curl.h",
++        "include/curl/curlbuild.h",
++        "include/curl/curlrules.h",
+         "include/curl/curlver.h",
+         "include/curl/easy.h",
+         "include/curl/mprintf.h",
+         "include/curl/multi.h",
+         "include/curl/stdcheaders.h",
+-        "include/curl/system.h",
+         "include/curl/typecheck-gcc.h",
+     ],
+     copts = select({
+@@ -264,7 +256,6 @@ cc_library(
+         "//conditions:default": [
+             "-Iexternal/curl/lib",
+             "-D_GNU_SOURCE",
+-            "-DBUILDING_LIBCURL",
+             "-DHAVE_CONFIG_H",
+             "-DCURL_DISABLE_FTP",
+             "-DCURL_DISABLE_NTLM",  # turning it off in configure is not enough
+@@ -685,7 +676,6 @@ genrule(
+         "#  define SIZEOF_INT 4",
+         "#  define SIZEOF_LONG 8",
+         "#  define SIZEOF_OFF_T 8",
+-        "#  define SIZEOF_CURL_OFF_T 8",
+         "#  define SIZEOF_SHORT 2",
+         "#  define SIZEOF_SIZE_T 8",
+         "#  define SIZEOF_TIME_T 8",
 diff --git a/third_party/gpus/crosstool/CROSSTOOL.tpl b/third_party/gpus/crosstool/CROSSTOOL.tpl
 index 1424ff6511..447f4c2ae0 100644
 --- a/third_party/gpus/crosstool/CROSSTOOL.tpl
@@ -269,6 +391,4 @@ index f6b497f813..ba3b190596 100644
      linkstatic = 1,
      visibility = ["//visibility:public"],
  )
--- 
-2.16.2
 
