@@ -2,7 +2,7 @@
 
 ## Tested environment
 
-- Mac OS X 10.12.6 16G1314
+- Mac OS X 10.12.6 16G1314 / MAC OS X 10.13.6 17G65
 - CommandLine Tools for Xcode 8.3.2
 - CUDA 9.1.128
 - cuDNN 7.0
