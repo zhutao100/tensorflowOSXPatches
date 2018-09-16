@@ -1,31 +1,3 @@
-diff --git a/configure.py b/configure.py
-index b6c32543cf..43332c3d7b 100644
---- a/configure.py
-+++ b/configure.py
-@@ -1109,8 +1109,8 @@ def set_tf_nccl_install_path(environ_cp):
-     ValueError: if this method was called under non-Linux platform.
-     UserInputError: if user has provided invalid input multiple times.
-   """
--  if not is_linux():
--    raise ValueError('Currently NCCL is only supported on Linux platforms.')
-+  if not (is_linux() or is_macos()):
-+    raise ValueError('Currently NCCL is only supported on Linux and Mac OS X platforms.')
- 
-   ask_nccl_version = (
-       'Please specify the NCCL version you want to use. '
-@@ -1511,9 +1511,12 @@ def main():
-       'TF_CUDA_CONFIG_REPO' not in environ_cp):
-     set_tf_cuda_version(environ_cp)
-     set_tf_cudnn_version(environ_cp)
-+
-     if is_linux():
-       set_tf_tensorrt_install_path(environ_cp)
-       set_tf_nccl_install_path(environ_cp)
-+    if is_macos():
-+      set_tf_nccl_install_path(environ_cp)
- 
-     set_tf_cuda_compute_capabilities(environ_cp)
-     if 'LD_LIBRARY_PATH' in environ_cp and environ_cp.get(
 diff --git a/tensorflow/core/framework/variant.h b/tensorflow/core/framework/variant.h
 index c02391dae3..7f76609814 100644
 --- a/tensorflow/core/framework/variant.h
@@ -116,13 +88,13 @@ index cbd75730fc..701c6e6ca7 100644
        urls = [
 -          "https://mirror.bazel.build/github.com/google/protobuf/archive/396336eb961b75f03b25824fe86cf6490fb75e3a.tar.gz",
 -          "https://github.com/google/protobuf/archive/396336eb961b75f03b25824fe86cf6490fb75e3a.tar.gz",
-+          "https://mirror.bazel.build/github.com/dtrebbien/protobuf/archive/50f552646ba1de79e07562b41f3999fe036b4fd0.tar.gz",
-+          "https://github.com/dtrebbien/protobuf/archive/50f552646ba1de79e07562b41f3999fe036b4fd0.tar.gz",
++          "https://mirror.bazel.build/github.com/dinever/protobuf/archive/188578878eff18c2148baba0e116d87ce8f49410.tar.gz",
++          "https://github.com/dinever/protobuf/archive/188578878eff18c2148baba0e116d87ce8f49410.tar.gz",
        ],
 -      sha256 = "846d907acf472ae233ec0882ef3a2d24edbbe834b80c305e867ac65a1f2c59e3",
 -      strip_prefix = "protobuf-396336eb961b75f03b25824fe86cf6490fb75e3a",
-+      sha256 = "eb16b33431b91fe8cee479575cee8de202f3626aaf00d9bf1783c6e62b4ffbc7",
-+      strip_prefix = "protobuf-50f552646ba1de79e07562b41f3999fe036b4fd0",
++      sha256 = "7a1d96ccdf7131535828cad737a76fd65ed766e9511e468d0daa3cc4f3db5175",
++      strip_prefix = "protobuf-188578878eff18c2148baba0e116d87ce8f49410",
    )
  
    # We need to import the protobuf library under the names com_google_protobuf
