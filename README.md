@@ -6,13 +6,13 @@
 - CUDA 9.1.128
 - cuDNN 7.0
 - Python 2.7.15 Homebrew
-- Bazel 0.11.1 (for v1.9 and previous); Bazel 0.15.2 (for v1.10.1 and later)
+- Bazel 0.11.1 (for v1.9 and previous) / Bazel 0.15.2 (for v1.10.1 and later)
 - CommandLine Tools for Xcode 8.3.2 / Xcode 8.3.2 (for Bazel 0.15.2 due to a bug that Bazel cannot recognize CommandLine Tools properly)
 
 ## Instruction
 
--- Apply patch to tensorflow repo.
--- Run build-mac-os-x.sh or manually do the steps inside.
+- Apply patch to tensorflow repo.
+- Run build-mac-os-x.sh or manually do the steps inside.
 
 ## Notes
 
